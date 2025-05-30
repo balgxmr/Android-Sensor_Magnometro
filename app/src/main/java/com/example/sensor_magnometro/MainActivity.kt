@@ -4,7 +4,6 @@ import android.content.Context
 import android.hardware.*
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -13,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +34,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Función de filtro de paso bajo para suavizar los datos del sensor
+fun lowPass(input: FloatArray, output: FloatArray?): FloatArray {
+    val alpha = 0.1f
+    if (output == null) return input
+    for (i in input.indices) {
+        output[i] = output[i] + alpha * (input[i] - output[i])
+    }
+    return output
+}
+
 @Composable
 fun CompassScreen() {
     val context = LocalContext.current
@@ -41,14 +51,18 @@ fun CompassScreen() {
     val azimuth = remember { mutableStateOf(0f) }
 
     DisposableEffect(Unit) {
-        val gravity = FloatArray(3)
-        val geomagnetic = FloatArray(3)
+        var gravity = FloatArray(3)
+        var geomagnetic = FloatArray(3)
 
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 when (event?.sensor?.type) {
-                    Sensor.TYPE_ACCELEROMETER -> System.arraycopy(event.values, 0, gravity, 0, 3)
-                    Sensor.TYPE_MAGNETIC_FIELD -> System.arraycopy(event.values, 0, geomagnetic, 0, 3)
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        gravity = lowPass(event.values.clone(), gravity)
+                    }
+                    Sensor.TYPE_MAGNETIC_FIELD -> {
+                        geomagnetic = lowPass(event.values.clone(), geomagnetic)
+                    }
                 }
 
                 val R = FloatArray(9)
